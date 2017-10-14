@@ -1,0 +1,105 @@
+/*Declare the library ASSIGN1*/ 
+LIBNAME ASSIGN1 '/home/jeremiahlowhorn0/my_courses/INFS762/Homework1/';
+
+/*Create filenames REFFILE1 and REFFILE2 to call in the PROC IMPORT procedure*/
+FILENAME REFFILE1 '/home/jeremiahlowhorn0/my_courses/INFS762/Homework1/data1.xlsx';
+FILENAME REFFILE2 '/home/jeremiahlowhorn0/my_courses/INFS762/Homework1/xtra1.xlsx';
+
+/*Import the filenames created above from the Excel workbooks loaded into SAS*/ 
+PROC IMPORT DATAFILE=REFFILE1
+	DBMS=XLSX
+	OUT=ASSIGN1.DATA1;
+	GETNAMES=YES;
+RUN;
+
+PROC IMPORT DATAFILE=REFFILE2
+	DBMS=XLSX
+	OUT=ASSIGN1.XTRA1;
+	GETNAMES=YES;
+RUN;
+
+/*Sort the ASSIGN1.DATA1 data by ACCTNO for the merge procedure.*/
+PROC SORT DATA=ASSIGN1.DATA1 OUT=ASSIGN1.DATA1;
+BY ACCTNO;
+RUN;
+
+/*Sort the ASSIGN1.XTRA1 data by ACCTNO for the merge procedure.*/
+PROC SORT DATA=ASSIGN1.XTRA1 OUT=ASSIGN1.XTRA1;
+BY ACCTNO;
+RUN;
+/*Merge the ASSIGN1.DATA1 data set with the ASSIGN1.XTRA1 by ACCTNO*/
+DATA ASSIGN1.COMPLETE;
+MERGE ASSIGN1.DATA1(in=a) ASSIGN1.XTRA1(in=b);
+BY ACCTNO;
+IF a THEN OUTPUT;
+RUN; 
+
+/*Print the ASSIGN1.COMPLETE*/
+PROC PRINT DATA= ASSIGN1.COMPLETE (OBS=20); 
+RUN;
+
+/*Sort the ASSIGN1.COMPLETE dataset by MNGPAY in descending order to create MNGPAY_M*/
+PROC SORT DATA=ASSIGN1.COMPLETE OUT=ASSIGN1.COMPLETE;
+BY DESCENDING MNGPAY;
+RUN;
+
+/*Create a variable MNGPAY_M that has the value 1 where MNGPAY has missing values*/
+DATA ASSIGN1.COMPLETE;
+SET ASSIGN1.COMPLETE;
+IF MISSING(MNGPAY) THEN MNGPAY_M=1; /* you need to fill in your code: if missing, then MNGPAY_M=1*/
+ELSE MNGPAY_M=0; /* you need to fill in your code: else (i.e. not missing) set MNGPAY_M =0*/ 
+RUN;
+
+/*Use proc standard to replace missing values of MNGPAY with the mean of MNGPAY*/
+PROC STANDARD DATA=ASSIGN1.COMPLETE OUT=ASSIGN1.COMPLETE REPLACE; 
+VAR MNGPAY;
+RUN;
+
+/*Sort the ASSIGN1.COMPLETE data set by MAKE and MODEL to compute the proc means procedure*/
+PROC SORT DATA=ASSIGN1.COMPLETE OUT=ASSIGN1.COMPLETE;
+BY MAKE MODEL;
+RUN;
+
+/*Use the proc means procedure by make and model computing the mean of MILEAG*/
+PROC MEANS DATA = ASSIGN1.COMPLETE;
+BY MAKE MODEL;
+VAR MILEAG;
+RUN;
+
+/*Create the ASSIGN1.REG_DATA set by keeping AGEOTD, AGEAVG, TRADES, TOTBAL, HSATRT, CURSAT, BRTRDS, 
+BROPEN, VDDASAV, and, GOOD*/
+DATA ASSIGN1.REG_DATA;
+SET ASSIGN1.COMPLETE;
+KEEP AGEOTD AGEAVG TRADES TOTBAL HSATRT CURSAT BRTRDS BROPEN VDDASAV GOOD;
+RUN;
+
+/*Use proc logistic on the dependent variable GOOD with the covariates AGEAVG,
+ TRADES, TOTBAL, HSATRT, CURSAT, BRTRDS, and BROPEN*/
+PROC LOGISTIC DATA = ASSIGN1.REG_DATA;
+CLASS VDDASAV;
+MODEL GOOD= AGEAVG TRADES TOTBAL HSATRT CURSAT BRTRDS BROPEN;
+RUN;
+
+/*Use stepwise regression on the above same regression model setting the minimum 
+specifiying the significance level of 0.05*/
+PROC LOGISTIC DATA= ASSIGN1.REG_DATA;
+CLASS VDDASAV;
+MODEL GOOD= AGEAVG TRADES TOTBAL HSATRT CURSAT BRTRDS BROPEN/
+SELECTION = STEPWISE
+SLENTRY=0.05
+SLSTAY=0.05;
+RUN;
+
+/*Use backward regression on the 1st model*/
+PROC LOGISTIC DATA= ASSIGN1.REG_DATA;
+CLASS VDDASAV;
+MODEL GOOD= AGEAVG TRADES TOTBAL HSATRT CURSAT BRTRDS BROPEN/
+SELECTION=BACKWARD;
+RUN;
+
+/*Use forward regression on the 1st model*/
+PROC LOGISTIC DATA= ASSIGN1.REG_DATA;
+CLASS VDDASAV;
+MODEL GOOD= AGEAVG TRADES TOTBAL HSATRT CURSAT BRTRDS BROPEN/
+SELECTION=FORWARD;
+RUN;
